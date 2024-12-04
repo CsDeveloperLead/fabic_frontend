@@ -74,22 +74,14 @@ const Login = () => {
     }
 
     try {
-      const response = await fetch(`${backend}/api/v1/users/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ identifier, password }), // Identifier can be either email or phone
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        setMessage(result.message);
-        login(result.token);
+      const response = await axios.post(`${backend}/api/v1/users/login`,{ identifier, password })
+      
+      if (response.status===200) {
+        setMessage(response.data.message);
+        login(response.data.token);
         navigate("/");
       } else {
-        setMessage(result.error);
+        setMessage(response.data.error);
       }
     } catch (error) {
       setMessage("An error occurred. Please try again.");
