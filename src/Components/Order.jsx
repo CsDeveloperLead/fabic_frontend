@@ -1,22 +1,74 @@
-import React, { useState } from 'react';
-import axios from 'axios';
+import { useState, useEffect } from "react";
+import axios from "axios";
 
 const OrderForm = () => {
-  const [client, setClient] = useState({ name: '', email: '', phone: '', address: '' });
+  const [client, setClient] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    address: "",
+  });
   const [products, setProducts] = useState([]);
-  const [receivingDate, setReceivingDate] = useState('');
-  const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('');
+  const [receivingDate, setReceivingDate] = useState("");
+  const [expectedDeliveryDate, setExpectedDeliveryDate] = useState("");
   const [paymentGiven, setPaymentGiven] = useState(0);
+  const [paymentStatus, setPaymentStatus] = useState("Not Paid");
+  const [orderStatus, setOrderStatus] = useState("In Process");
+
+  // Calculate total service cost
+  const totalCost = products.reduce((total, product) => total + product.serviceCost, 0);
+
+  // Update payment status based on payment given vs total cost
+  useEffect(() => {
+    if (paymentGiven === 0) {
+      setPaymentStatus("Not Paid");
+    } else if (paymentGiven < totalCost) {
+      setPaymentStatus("Partially Paid");
+    } else if (paymentGiven >= totalCost) {
+      setPaymentStatus("Full Paid");
+    }
+  }, [paymentGiven, totalCost]);
 
   const handleAddProduct = () => {
-    setProducts([...products, { type: '', productId: '', name: '', serviceCost: 0, status: 'In Process', photo: null }]);
+    setProducts([
+      ...products,
+      {
+        type: "",
+        productId: generateProductId(""),
+        name: "",
+        serviceCost: 0,
+        status: "In Process",
+        photo: null,
+      },
+    ]);
+  };
+
+  const handleDeleteProduct = (index) => {
+    const updatedProducts = products.filter((_, i) => i !== index);
+    setProducts(updatedProducts);
   };
 
   const handleProductChange = (index, key, value) => {
     const updatedProducts = [...products];
+  
+    // Update the key with the new value
     updatedProducts[index][key] = value;
+  
+    // If the key is 'name', generate and update the productId
+    if (key === "name") {
+      updatedProducts[index].productId = generateProductId(value);
+    }
+  
     setProducts(updatedProducts);
   };
+  
+  // Function to generate the product ID
+  const generateProductId = (name) => {
+    const prefix = name.substring(0, 2).toUpperCase(); // First two letters of the name
+    const uniqueNumber = Math.floor(100000 + Math.random() * 900000); // Generate a random 6-digit number
+    return prefix + uniqueNumber;
+  };
+  
 
   const handleFileChange = (index, file) => {
     const updatedProducts = [...products];
@@ -24,71 +76,267 @@ const OrderForm = () => {
     setProducts(updatedProducts);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const formData = new FormData();
-    formData.append('client', JSON.stringify(client));
-    formData.append('products', JSON.stringify(products.map(p => ({ ...p, photo: undefined }))));
-    formData.append('receivingDate', receivingDate);
-    formData.append('expectedDeliveryDate', expectedDeliveryDate);
-    formData.append('paymentGiven', paymentGiven);
-
-    products.forEach(product => {
-      if (product.photo) formData.append('photos', product.photo);
-    });
-
-    try {
-      const { data } = await axios.post('http://localhost:5000/api/orders/create', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      alert('Order created successfully!');
-      console.log(data);
-    } catch (error) {
-      console.error(error);
-      alert('Error creating order.');
-    }
+  const handleOrderStatusChange = (status) => {
+    setOrderStatus(status);
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+  
+    const formData = new FormData();
+  
+    // Append data
+    formData.append("client", JSON.stringify(client));
+    formData.append(
+      "products",
+      JSON.stringify(products.map((p) => ({ ...p, photo: undefined })))
+    );
+    formData.append("receivingDate", receivingDate);
+    formData.append("expectedDeliveryDate", expectedDeliveryDate);
+    formData.append("paymentGiven", paymentGiven);
+    formData.append("paymentStatus", paymentStatus);
+    formData.append("orderStatus", orderStatus);
+  
+    // Append files
+    products.forEach((product, index) => {
+      if (product.photo) {
+        formData.append(`productPhotos[${index}]`, product.photo);
+      }
+    });
+  
+    // Debugging: Log FormData contents
+    for (let pair of formData.entries()) {
+      console.log(`${pair[0]}:`, pair[1]);
+    }
+  
+    console.log("FORMDATA ---------------------------------------------------------------", formData.entries())
+    try {
+      const { data } = await axios.post(
+        "http://localhost:8000/api/v1/orders/create",
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
+      alert("Order created successfully!");
+      console.log(data);
+    } catch (error) {
+      console.error("Error creating order:", error.response || error.message);
+      alert("Error creating order.");
+    }
+  };
+  
+
   return (
-    <form onSubmit={handleSubmit}>
-      <h2>Place Order</h2>
-      <div>
-        <label>Client Name:</label>
-        <input type="text" value={client.name} onChange={(e) => setClient({ ...client, name: e.target.value })} required />
-        <label>Email:</label>
-        <input type="email" value={client.email} onChange={(e) => setClient({ ...client, email: e.target.value })} required />
-        <label>Phone:</label>
-        <input type="text" value={client.phone} onChange={(e) => setClient({ ...client, phone: e.target.value })} required />
-        <label>Address:</label>
-        <input type="text" value={client.address} onChange={(e) => setClient({ ...client, address: e.target.value })} required />
+    <form onSubmit={handleSubmit} className="w-full flex flex-col p-10 items-center">
+      <h2 className="text-3xl font-bold mb-6">ORDER CREATION</h2>
+      <div className="w-full flex justify-between gap-10 mb-4">
+        <div className="w-1/2">
+          <label className="text-sm font-medium text-gray-700 mb-2">Name:</label>
+          <input
+            type="text"
+            value={client.name}
+            onChange={(e) => setClient({ ...client, name: e.target.value })}
+            required
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500 outline-none"
+            placeholder="Enter client name"
+          />
+        </div>
+
+        <div className="w-1/2">
+          <label className=" text-sm font-medium text-gray-700 mb-2">Email:</label>
+          <input
+            type="email"
+            value={client.email}
+            onChange={(e) => setClient({ ...client, email: e.target.value })}
+            required
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500 outline-none"
+            placeholder="Enter email address"
+          />
+        </div>
       </div>
-      <div>
-        <h3>Products</h3>
+
+      <div className="w-full flex justify-between gap-10">
+        <div className="w-1/2">
+          <label className="text-sm font-medium text-gray-700 mb-2">Phone:</label>
+          <input
+            type="text"
+            value={client.phone}
+            onChange={(e) => setClient({ ...client, phone: e.target.value })}
+            required
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500 outline-none"
+            placeholder="Enter phone number"
+          />
+        </div>
+
+        <div className="w-1/2">
+          <label className="text-sm font-medium text-gray-700 mb-2">Address:</label>
+          <input
+            type="text"
+            value={client.address}
+            onChange={(e) => setClient({ ...client, address: e.target.value })}
+            required
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500 outline-none"
+            placeholder="Enter address"
+          />
+        </div>
+      </div>
+
+      <div className="w-full">
+        <h3 className="text-2xl font-bold my-4">PRODUCTS</h3>
         {products.map((product, index) => (
-          <div key={index}>
-            <label>Type:</label>
-            <input type="text" value={product.type} onChange={(e) => handleProductChange(index, 'type', e.target.value)} required />
-            <label>Product ID:</label>
-            <input type="text" value={product.productId} onChange={(e) => handleProductChange(index, 'productId', e.target.value)} required />
-            <label>Name:</label>
-            <input type="text" value={product.name} onChange={(e) => handleProductChange(index, 'name', e.target.value)} required />
-            <label>Service Cost:</label>
-            <input type="number" value={product.serviceCost} onChange={(e) => handleProductChange(index, 'serviceCost', e.target.value)} required />
-            <label>Photo:</label>
-            <input type="file" onChange={(e) => handleFileChange(index, e.target.files[0])} />
+          <div key={index} className="w-full space-y-4 mb-4">
+            {/* Product Name & Type */}
+            <div className="w-full flex gap-10">
+              <div className="w-1/2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Product Name:
+                </label>
+                <input
+                  type="text"
+                  value={product.name}
+                  onChange={(e) =>
+                    handleProductChange(index, "name", e.target.value)
+                  }
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500 outline-none"
+                  placeholder="Enter product name"
+                />
+              </div>
+              <div className="w-1/2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Product Type:
+                </label>
+                <select
+                  value={product.type}
+                  onChange={(e) =>
+                    handleProductChange(index, "type", e.target.value)
+                  }
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500 outline-none bg-white"
+                >
+                  <option value="" disabled>Select product type</option>
+                  <option value="Type 1">Type 1</option>
+                  <option value="Type 2">Type 2</option>
+                  <option value="Type 3">Type 3</option>
+                  <option value="Type 4">Type 4</option>
+                  <option value="Type 5">Type 5</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Service Cost & Photo */}
+            <div className="w-full flex gap-10">
+              <div className="w-1/2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Service Cost:
+                </label>
+                <input
+                  type="number"
+                  value={product.serviceCost}
+                  onChange={(e) =>
+                    handleProductChange(index, "serviceCost", parseFloat(e.target.value))
+                  }
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500 outline-none"
+                  placeholder="Enter service cost"
+                />
+              </div>
+              <div className="w-1/2">
+                <label className=" text-sm font-medium text-gray-700 mb-2">
+                  Photo:
+                </label>
+                <div className="flex gap-10">
+                  <input
+                    type="file"
+                    onChange={(e) => handleFileChange(index, e.target.files[0])}
+                    className="w-1/2 px-4 py-1.5 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500 outline-none bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteProduct(index)}
+                    className="px-4 py-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                  >
+                    Delete Product
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         ))}
-        <button type="button" onClick={handleAddProduct}>Add Product</button>
+        <button
+          type="button"
+          onClick={handleAddProduct}
+          className="px-4 py-2 bg-blue-500 text-white rounded-lg mt-4"
+        >
+          Add Product
+        </button>
       </div>
-      <div>
-        <label>Receiving Date:</label>
-        <input type="date" value={receivingDate} onChange={(e) => setReceivingDate(e.target.value)} required />
-        <label>Expected Delivery Date:</label>
-        <input type="date" value={expectedDeliveryDate} onChange={(e) => setExpectedDeliveryDate(e.target.value)} required />
-        <label>Payment Given:</label>
-        <input type="number" value={paymentGiven} onChange={(e) => setPaymentGiven(e.target.value)} required />
+
+      {/* Receiving Date and Expected Delivery Date */}
+      <div className="w-full flex justify-between gap-10 mt-4">
+        <div className="w-1/2">
+          <label className="text-sm font-medium text-gray-700 mb-2">Receiving Date:</label>
+          <input
+            type="date"
+            value={receivingDate}
+            onChange={(e) => setReceivingDate(e.target.value)}
+            required
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500 outline-none"
+          />
+        </div>
+
+        <div className="w-1/2">
+          <label className="text-sm font-medium text-gray-700 mb-2">
+            Expected Delivery Date:
+          </label>
+          <input
+            type="date"
+            value={expectedDeliveryDate}
+            onChange={(e) => setExpectedDeliveryDate(e.target.value)}
+            required
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500 outline-none"
+          />
+        </div>
       </div>
-      <button type="submit">Create Order</button>
+
+      {/* Payment Information */}
+      <div className="w-full mt-4">
+        <label className="text-sm font-medium text-gray-700 mb-2">Payment Given:</label>
+        <input
+          type="number"
+          value={paymentGiven}
+          onChange={(e) => setPaymentGiven(parseFloat(e.target.value))}
+          required
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500 outline-none"
+          placeholder="Enter payment given"
+        />
+        <p className="mt-2 text-sm text-gray-600">
+          Total Cost: ₹{totalCost.toFixed(2)}
+        </p>
+        <p className="mt-1 text-sm text-gray-600">Payment Status: {paymentStatus}</p>
+      </div>
+
+      {/* Order Status */}
+      <div className="w-full mt-4">
+        <label className="text-sm font-medium text-gray-700 mb-2">Order Status:</label>
+        <select
+          value={orderStatus}
+          onChange={(e) => handleOrderStatusChange(e.target.value)}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500 outline-none"
+        >
+          <option value="In Process">In Process</option>
+          <option value="Shipped">Shipped</option>
+          <option value="Delivered">Delivered</option>
+        </select>
+      </div>
+
+      <button
+        type="submit"
+        className="px-4 py-2 bg-green-500 text-white rounded-lg mt-6"
+      >
+        Submit Order
+      </button>
     </form>
   );
 };
