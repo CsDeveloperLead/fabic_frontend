@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 
+const backend = import.meta.env.VITE_BACKEND_URL;
+
 const OrderForm = () => {
   const [client, setClient] = useState({
     name: "",
@@ -14,6 +16,8 @@ const OrderForm = () => {
   const [paymentGiven, setPaymentGiven] = useState(0);
   const [paymentStatus, setPaymentStatus] = useState("Not Paid");
   const [orderStatus, setOrderStatus] = useState("In Process");
+  const [orderIssue, setOrderIssue] = useState("");
+  const [orderIssueToggle, setOrderIssueToggle] = useState(false);
 
   // Calculate total service cost
   const totalCost = products.reduce((total, product) => total + product.serviceCost, 0);
@@ -39,6 +43,9 @@ const OrderForm = () => {
         serviceCost: 0,
         status: "In Process",
         photo: null,
+        serviceType: "",
+        issue: "",
+        isIssueVisible: false,
       },
     ]);
   };
@@ -50,25 +57,25 @@ const OrderForm = () => {
 
   const handleProductChange = (index, key, value) => {
     const updatedProducts = [...products];
-  
+
     // Update the key with the new value
     updatedProducts[index][key] = value;
-  
+
     // If the key is 'name', generate and update the productId
     if (key === "name") {
       updatedProducts[index].productId = generateProductId(value);
     }
-  
+
     setProducts(updatedProducts);
   };
-  
+
   // Function to generate the product ID
   const generateProductId = (name) => {
     const prefix = name.substring(0, 2).toUpperCase(); // First two letters of the name
     const uniqueNumber = Math.floor(100000 + Math.random() * 900000); // Generate a random 6-digit number
     return prefix + uniqueNumber;
   };
-  
+
 
   const handleFileChange = (index, file) => {
     const updatedProducts = [...products];
@@ -82,55 +89,78 @@ const OrderForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-  
+    console.log(products);
+
+
     const formData = new FormData();
-  
+
     // Append data
     formData.append("client", JSON.stringify(client));
     formData.append(
       "products",
-      JSON.stringify(products.map((p) => ({ ...p, photo: undefined })))
+      JSON.stringify(products.map((p) => ({ ...p, photo: undefined, isIssueVisible: undefined, issue: p.isIssueVisible && p.issue ? p.issue : undefined, })))
     );
     formData.append("receivingDate", receivingDate);
     formData.append("expectedDeliveryDate", expectedDeliveryDate);
     formData.append("paymentGiven", paymentGiven);
     formData.append("paymentStatus", paymentStatus);
     formData.append("orderStatus", orderStatus);
-  
+    formData.append("orderIssue", orderIssue);
+
     // Append files
     products.forEach((product, index) => {
       if (product.photo) {
         formData.append(`productPhotos[${index}]`, product.photo);
       }
     });
-  
-    // Debugging: Log FormData contents
-    for (let pair of formData.entries()) {
-      console.log(`${pair[0]}:`, pair[1]);
-    }
-  
-    console.log("FORMDATA ---------------------------------------------------------------", formData.entries())
+
     try {
-      const { data } = await axios.post(
-        "http://localhost:8000/api/v1/orders/create",
+      await axios.post(
+        `${backend}/api/v1/orders/create`,
         formData,
         {
           headers: { "Content-Type": "multipart/form-data" },
         }
       );
       alert("Order created successfully!");
-      console.log(data);
+      setClient({
+        name: "",
+        email: "",
+        phone: "",
+        address: ""
+      })
+
+      setProducts([])
+      setReceivingDate('')
+      setExpectedDeliveryDate('')
+      setPaymentGiven(0)
+      setPaymentStatus("Not Paid")
+      setOrderStatus("In Process")
+      setOrderIssue('')
+      setOrderIssueToggle(false)
     } catch (error) {
       console.error("Error creating order:", error.response || error.message);
       alert("Error creating order.");
     }
   };
-  
+
+  const toggleIssueVisibility = (index) => {
+    const updatedProducts = [...products];
+    updatedProducts[index].isIssueVisible = !updatedProducts[index].isIssueVisible;
+    setProducts(updatedProducts);
+  };
+
+  // Update the issue for a product
+  const handleIssueChange = (index, issue) => {
+    const updatedProducts = [...products];
+    updatedProducts[index].issue = issue;
+    setProducts(updatedProducts);
+  };
 
   return (
     <form onSubmit={handleSubmit} className="w-full flex flex-col p-10 items-center">
       <h2 className="text-3xl font-bold mb-6">ORDER CREATION</h2>
-      <div className="w-full flex justify-between gap-10 mb-4">
+      <div className="w-full flex justify-between gap-2 sm:gap-10 mb-4">
         <div className="w-1/2">
           <label className="text-sm font-medium text-gray-700 mb-2">Name:</label>
           <input
@@ -156,7 +186,7 @@ const OrderForm = () => {
         </div>
       </div>
 
-      <div className="w-full flex justify-between gap-10">
+      <div className="w-full flex justify-between gap-2 sm:gap-10">
         <div className="w-1/2">
           <label className="text-sm font-medium text-gray-700 mb-2">Phone:</label>
           <input
@@ -186,9 +216,9 @@ const OrderForm = () => {
         <h3 className="text-2xl font-bold my-4">PRODUCTS</h3>
         {products.map((product, index) => (
           <div key={index} className="w-full space-y-4 mb-4">
-            {/* Product Name & Type */}
-            <div className="w-full flex gap-10">
-              <div className="w-1/2">
+            {/* Product Name, Type & Service Type */}
+            <div className="w-full grid grid-cols-2 gap-2 md:grid-cols-3 sm:gap-10">
+              <div className="">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Product Name:
                 </label>
@@ -203,7 +233,7 @@ const OrderForm = () => {
                   placeholder="Enter product name"
                 />
               </div>
-              <div className="w-1/2">
+              <div className="">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Product Type:
                 </label>
@@ -223,11 +253,30 @@ const OrderForm = () => {
                   <option value="Type 5">Type 5</option>
                 </select>
               </div>
+              <div className="">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Services Type:
+                </label>
+                <select
+                  value={product.serviceType}
+                  onChange={(e) =>
+                    handleProductChange(index, "serviceType", e.target.value)
+                  }
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500 outline-none bg-white"
+                >
+                  <option value="" disabled>Select Services type</option>
+                  <option value="Laundry">Laundry</option>
+                  <option value="Washing">Washing</option>
+                  <option value="Dry Cleaning">Dry Cleaning</option>
+                  <option value="Ironing">Ironing</option>
+                </select>
+              </div>
             </div>
 
             {/* Service Cost & Photo */}
-            <div className="w-full flex gap-10">
-              <div className="w-1/2">
+            <div className="w-full flex flex-col sm:flex-row gap-3 sm:gap-10">
+              <div className="w-full sm:w-1/2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Service Cost:
                 </label>
@@ -242,11 +291,11 @@ const OrderForm = () => {
                   placeholder="Enter service cost"
                 />
               </div>
-              <div className="w-1/2">
+              <div className="w-full sm:w-1/2">
                 <label className=" text-sm font-medium text-gray-700 mb-2">
                   Photo:
                 </label>
-                <div className="flex gap-10">
+                <div className="flex gap-2 sm:gap-10">
                   <input
                     type="file"
                     onChange={(e) => handleFileChange(index, e.target.files[0])}
@@ -262,20 +311,52 @@ const OrderForm = () => {
                 </div>
               </div>
             </div>
+
+            {/* raise a issue btn */}
+            <div className="w-full flex flex-col gap-2">
+              {product.isIssueVisible ? (
+                <div>
+                  <textarea
+                    value={product.issue}
+                    onChange={(e) => handleIssueChange(index, e.target.value)}
+                    placeholder="Describe the issue"
+                    rows="3"
+                    className="w-full p-2 border border-gray-300 rounded-lg resize-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => toggleIssueVisibility(index)}
+                    className="mt-2 text-red-500"
+                  >
+                    Delete Issue
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => toggleIssueVisibility(index)}
+                  className="mt-2 text-blue-500"
+                >
+                  Raise an Issue
+                </button>
+              )}
+            </div>
+
+            <div className="w-full h-auto flex flex-col"></div>
           </div>
         ))}
         <button
           type="button"
           onClick={handleAddProduct}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg mt-4"
+          className="px-4 py-2 bg-blue-500 text-white rounded-lg mt-0"
         >
           Add Product
         </button>
       </div>
 
       {/* Receiving Date and Expected Delivery Date */}
-      <div className="w-full flex justify-between gap-10 mt-4">
-        <div className="w-1/2">
+      <div className="w-full flex flex-col sm:flex-row justify-between gap-2 sm:gap-10 mt-4">
+        <div className="w-full sm:w-1/2">
           <label className="text-sm font-medium text-gray-700 mb-2">Receiving Date:</label>
           <input
             type="date"
@@ -286,7 +367,7 @@ const OrderForm = () => {
           />
         </div>
 
-        <div className="w-1/2">
+        <div className="w-full sm:w-1/2">
           <label className="text-sm font-medium text-gray-700 mb-2">
             Expected Delivery Date:
           </label>
@@ -330,6 +411,37 @@ const OrderForm = () => {
           <option value="Delivered">Delivered</option>
         </select>
       </div>
+
+      {/* Order Issue */}
+      <div className="w-full flex flex-col gap-2 mt-4">
+        {orderIssueToggle ? (
+          <div>
+            <textarea
+              value={orderIssue}
+              onChange={(e) => setOrderIssue(e.target.value)}
+              placeholder="Describe the issue"
+              rows="3"
+              className="w-full p-2 border border-gray-300 rounded-lg resize-none"
+            />
+            <button
+              type="button"
+              onClick={() => setOrderIssueToggle(false)}
+              className="mt-2 text-red-500"
+            >
+              Delete Issue
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setOrderIssueToggle(true)}
+            className="mt-2 text-blue-500"
+          >
+            Raise an Issue
+          </button>
+        )}
+      </div>
+
 
       <button
         type="submit"

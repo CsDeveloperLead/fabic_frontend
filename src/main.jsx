@@ -9,6 +9,8 @@ import Signup from './Components/Signup.jsx'
 import { AuthProvider } from './Components/AuthContext.jsx'
 import ForgotPassword from './Components/ForgotPassword.jsx'
 import StaffDashboard from './Components/StaffDashboard.jsx'
+import AdminLogin from './Components/AdminComponents/AdminLogin.jsx'
+import AdminDashboard from './Components/AdminComponents/AdminDashboard.jsx'
 
 const router = createBrowserRouter(
   createRoutesFromElements(
@@ -19,6 +21,8 @@ const router = createBrowserRouter(
         <Route path='/signup-page' element={<Signup />} />
         <Route path='/forgot-password' element={<ForgotPassword />} />
         <Route path='/staff-dashboard' element={<StaffDashboard />} />
+        <Route path='/admin' element={<AdminLogin />} />
+        <Route path='/admin-dashboard' element={<AdminDashboard />} />
       </Route >
     </>
   )
