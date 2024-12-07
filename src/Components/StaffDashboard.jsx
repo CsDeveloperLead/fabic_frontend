@@ -4,6 +4,10 @@ import OrderForm from "./Order";
 import { AiOutlineCloseCircle } from "react-icons/ai";
 import axios from "axios";
 import SingleOrder from "./SingleOrder";
+import { jwtDecode } from "jwt-decode";
+import AuthContext from "./AuthContext";
+import { useContext } from "react";
+import { useNavigate } from 'react-router-dom'
 
 const backend = import.meta.env.VITE_BACKEND_URL;
 
@@ -12,6 +16,8 @@ const StaffDashboard = () => {
   const [isOrderDetailsOpen, setIsOrderDetailsOpen] = useState(false);
   const [singleOrderDetails, setSingleOrderDetails] = useState({});
   const [orders, setOrders] = useState([]);
+  const { isAuthenticated } = useContext(AuthContext)
+  const navigate = useNavigate()
 
   const openOrderForm = () => {
     setIsOrderFormOpen(true);
@@ -43,6 +49,24 @@ const StaffDashboard = () => {
   useEffect(() => {
     getOrders();
   }, [])
+
+  useEffect(() => {
+    const token = localStorage.getItem("authToken");
+    if (token) {
+      const decodedToken = jwtDecode(token)
+      console.log(decodedToken.role);
+      
+      if (decodedToken.role === 'customer') {
+        navigate('/')
+      }
+    } else {
+      navigate('/')
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (isAuthenticated) getOrders()
+  }, [isAuthenticated]);
 
   return (
     <div className="mx-10 mt-10 flex flex-col items-center">

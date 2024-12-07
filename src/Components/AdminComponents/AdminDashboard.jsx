@@ -58,15 +58,16 @@ function AdminDashboard() {
         const token = localStorage.getItem("authToken");
         if (token) {
             const decodedToken = jwtDecode(token)
-            if (decodedToken.email !== 'fabnic@admin.com') {
+            if (decodedToken.role !== 'admin') {
                 navigate('/')
             }
+        } else {
+            navigate('/')
         }
     }, [isAuthenticated]);
 
     useEffect(() => {
         if (isAuthenticated) fetchAllUsers()
-        else navigate('/')
     }, [isAuthenticated]);
 
     return (
